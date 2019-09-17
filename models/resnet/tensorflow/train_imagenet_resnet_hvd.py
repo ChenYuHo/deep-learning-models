@@ -718,7 +718,7 @@ def cnn_model_function(features, labels, mode, params):
 
         opt = tf.train.MomentumOptimizer(
             learning_rate, momentum, use_nesterov=True)
-        opt = hvd.DistributedOptimizer(opt)
+        opt = hvd.DistributedOptimizer(opt, device_dense=FLAGS.horovod_device)
         if use_larc:
             opt = LarcOptimizer(opt, learning_rate, leta, clip=True)
         opt = MixedPrecisionOptimizer(opt, scale=loss_scale)
@@ -801,7 +801,7 @@ def add_cli_args():
                       can access.""")
     cmdline.add_argument('--eval_interval', type=int,
                          help="""Evaluate accuracy per eval_interval number of epochs""")
-    add_bool_argument(cmdline, '--fp16', default=True,
+    add_bool_argument(cmdline, '--fp16', default=False,
                       help="""Train using float16 (half) precision instead
                       of float32.""")
     cmdline.add_argument('--num_gpus', default=1, type=int,
@@ -871,6 +871,11 @@ def add_cli_args():
                          help="""hue max delta factor, hue delta = hue * math.pi""")
     cmdline.add_argument('--brightness', default=0.3, type=float,
                          help="""Brightness factor""")
+    cmdline.add_argument('--horovod_device', default='', type=str,
+                         help="""Device to do Horovod all-reduce on
+                                 empty (default), cpu or gpu. Default with utilize GPU if
+                                 Horovod was compiled with the HOROVOD_GPU_ALLREDUCE
+                                 option, and CPU otherwise.""")
     return cmdline
 
 
