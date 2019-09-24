@@ -1027,7 +1027,7 @@ def main():
 
     classifier = tf.estimator.Estimator(
         model_fn=cnn_model_function,
-        model_dir=wandb.run.dir if not hvd.rank() else None,
+        model_dir=FLAGS.log_dir,
         params={
             'model': FLAGS.model,
             'decay_steps': decay_steps,
