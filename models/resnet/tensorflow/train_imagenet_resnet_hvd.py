@@ -47,9 +47,11 @@ import shutil
 import logging
 import math
 import re
+import wandb
 from glob import glob
 from operator import itemgetter
 from tensorflow.python.util import nest
+from wandb.tensorflow import WandbHook
 
 def rank0log(logger, *args, **kwargs):
     if hvd.rank() == 0:
@@ -421,7 +423,7 @@ class LogSessionRunHook(tf.train.SessionRunHook):
         self.logger = logger
 
     def after_create_session(self, session, coord):
-        rank0log(self.logger, '  Step Epoch Speed   Loss  FinLoss   LR')
+        rank0log(self.logger, '  Step Epoch Speed   Loss  FinLoss   LR    time')
         self.elapsed_secs = 0.
         self.count = 0
 
@@ -895,6 +897,7 @@ def sort_and_load_ckpts(log_dir):
 
 
 def main():
+    wandb.init(project="sigmod2020")
     gpu_thread_count = 2
     os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
     os.environ['TF_GPU_THREAD_COUNT'] = str(gpu_thread_count)
@@ -1016,7 +1019,7 @@ def main():
 
     classifier = tf.estimator.Estimator(
         model_fn=cnn_model_function,
-        model_dir=FLAGS.log_dir,
+        model_dir=wandb.run.dir,
         params={
             'model': FLAGS.model,
             'decay_steps': decay_steps,
@@ -1062,6 +1065,7 @@ def main():
                 LogSessionRunHook(global_batch_size,
                                   num_training_samples,
                                   FLAGS.display_every, logger))
+            training_hooks.append(WandbHook())
         try:
             start_time = time.time()
             classifier.train(
