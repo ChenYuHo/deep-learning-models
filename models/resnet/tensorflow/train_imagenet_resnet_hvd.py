@@ -897,7 +897,7 @@ def sort_and_load_ckpts(log_dir):
 
 
 def main():
-    wandb.init(project="sigmod2020")
+    wandb.init(project="sigmod2020", entity="sands-lab")
     gpu_thread_count = 2
     os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
     os.environ['TF_GPU_THREAD_COUNT'] = str(gpu_thread_count)
