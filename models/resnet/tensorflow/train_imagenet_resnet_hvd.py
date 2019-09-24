@@ -443,11 +443,11 @@ class LogSessionRunHook(tf.train.SessionRunHook):
             epoch = global_step * self.global_batch_size / self.num_records
             self.logger.info('%6i %5.1f %7.1f %6.3f %6.3f %7.5f %f' %
                              (global_step, epoch, img_per_sec, loss, total_loss, lr, time.time()))
-            tf.summary.scalar("epoch", epoch)
-            tf.summary.scalar("img_per_sec", img_per_sec)
-            tf.summary.scalar("loss", loss)
-            tf.summary.scalar("total_loss", total_loss)
-            tf.summary.scalar("lr", lr)
+            wandb.log({"epoch": epoch}, step=global_step)
+            wandb.log({"img_per_sec": img_per_sec}, step=global_step)
+            wandb.log({"loss": loss}, step=global_step)
+            wandb.log({"total_loss": total_loss}, step=global_step)
+            wandb.log({"lr": lr}, step=global_step)
             self.elapsed_secs = 0.
             self.count = 0
 
@@ -691,7 +691,6 @@ def cnn_model_function(features, labels, mode, params):
         loss = tf.losses.sparse_softmax_cross_entropy(
             logits=logits, labels=labels)
         loss = tf.identity(loss, name='loss')  # For access by logger (TODO: Better way to access it?)
-#         tf.summary.scalar('sparse_softmax_cross_entropy', loss)
 
         if mode == tf.estimator.ModeKeys.EVAL:
             with tf.device(None):  # Allow fallback to CPU if no GPU support for these ops
@@ -923,7 +922,8 @@ def main():
         for bad_arg in unknown_args:
             print("ERROR: Unknown command line arg: %s" % bad_arg)
         raise ValueError("Invalid command line arg(s)")
-    wandb.init(project="sigmod2020", entity="sands-lab", config=FLAGS, sync_tensorboard=True)
+    if not hvd.rank():
+        wandb.init(project="sigmod2020", entity="sands-lab", config=FLAGS, sync_tensorboard=True)
 
 
     config = tf.ConfigProto()
@@ -1027,7 +1027,7 @@ def main():
 
     classifier = tf.estimator.Estimator(
         model_fn=cnn_model_function,
-        model_dir=wandb.run.dir,
+        model_dir=wandb.run.dir if not hvd.rank() else None,
         params={
             'model': FLAGS.model,
             'decay_steps': decay_steps,
@@ -1132,9 +1132,9 @@ def main():
                                  c['loss'],
                                  time=time.strftime('%Y-%m-%d %H:%M:%S', 
                                     time.localtime(c['mtime']))))
-                tf.summary.scalar("top1", c['top1'] * 100)
-                tf.summary.scalar("top5", c['top5'] * 100)
-                tf.summary.scalar("test_loss", c['loss'])
+                wandb.log({"top1": c['top1'] * 100}, step=c['step'])
+                wandb.log({"top5": c['top5'] * 100}, step=c['step'])
+                wandb.log({"test_loss": c['loss']}, step=c['step'])
             rank0log(logger, "Finished evaluation")
         except KeyboardInterrupt:
             logger.error("Keyboard interrupt")
