@@ -443,6 +443,11 @@ class LogSessionRunHook(tf.train.SessionRunHook):
             epoch = global_step * self.global_batch_size / self.num_records
             self.logger.info('%6i %5.1f %7.1f %6.3f %6.3f %7.5f %f' %
                              (global_step, epoch, img_per_sec, loss, total_loss, lr, time.time()))
+            tf.summary.scalar("epoch", epoch)
+            tf.summary.scalar("img_per_sec", img_per_sec)
+            tf.summary.scalar("loss", loss)
+            tf.summary.scalar("total_loss", total_loss)
+            tf.summary.scalar("lr", lr)
             self.elapsed_secs = 0.
             self.count = 0
 
@@ -686,6 +691,7 @@ def cnn_model_function(features, labels, mode, params):
         loss = tf.losses.sparse_softmax_cross_entropy(
             logits=logits, labels=labels)
         loss = tf.identity(loss, name='loss')  # For access by logger (TODO: Better way to access it?)
+#         tf.summary.scalar('sparse_softmax_cross_entropy', loss)
 
         if mode == tf.estimator.ModeKeys.EVAL:
             with tf.device(None):  # Allow fallback to CPU if no GPU support for these ops
@@ -696,6 +702,8 @@ def cnn_model_function(features, labels, mode, params):
                 newaccuracy = (hvd.allreduce(accuracy[0]), accuracy[1])
                 newtop5acc = (hvd.allreduce(top5acc[0]), top5acc[1])
                 metrics = {'val-top1acc': newaccuracy, 'val-top5acc': newtop5acc}
+#                 tf.summary.scalar('top1acc', newaccuracy)
+#                 tf.summary.scalar('top5acc', newtop5acc)
             return tf.estimator.EstimatorSpec(
                 mode, loss=loss, eval_metric_ops=metrics)
 
@@ -716,7 +724,7 @@ def cnn_model_function(features, labels, mode, params):
                                                    cdr_first_decay_ratio, cdr_t_mul, cdr_m_mul, cdr_alpha, 
                                                    lc_periods, lc_alpha, lc_beta))
             learning_rate = tf.identity(learning_rate, 'learning_rate')
-            tf.summary.scalar('learning_rate', learning_rate)
+#             tf.summary.scalar('learning_rate', learning_rate)
 
         opt = tf.train.MomentumOptimizer(
             learning_rate, momentum, use_nesterov=True)
@@ -897,7 +905,6 @@ def sort_and_load_ckpts(log_dir):
 
 
 def main():
-    wandb.init(project="sigmod2020", entity="sands-lab")
     gpu_thread_count = 2
     os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
     os.environ['TF_GPU_THREAD_COUNT'] = str(gpu_thread_count)
@@ -916,6 +923,7 @@ def main():
         for bad_arg in unknown_args:
             print("ERROR: Unknown command line arg: %s" % bad_arg)
         raise ValueError("Invalid command line arg(s)")
+    wandb.init(project="sigmod2020", entity="sands-lab", config=FLAGS, sync_tensorboard=True)
 
 
     config = tf.ConfigProto()
@@ -1124,6 +1132,9 @@ def main():
                                  c['loss'],
                                  time=time.strftime('%Y-%m-%d %H:%M:%S', 
                                     time.localtime(c['mtime']))))
+                tf.summary.scalar("top1", c['top1'] * 100)
+                tf.summary.scalar("top5", c['top5'] * 100)
+                tf.summary.scalar("test_loss", c['loss'])
             rank0log(logger, "Finished evaluation")
         except KeyboardInterrupt:
             logger.error("Keyboard interrupt")
