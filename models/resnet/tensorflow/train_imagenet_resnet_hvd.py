@@ -907,6 +907,7 @@ def main():
     # tf.set_random_seed(31 * (1 + hvd.rank()))
 
     cmdline = add_cli_args()
+    global FLAGS
     FLAGS, unknown_args = cmdline.parse_known_args()
     if len(unknown_args) > 0:
         for bad_arg in unknown_args:
